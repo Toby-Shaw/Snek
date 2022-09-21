@@ -23,7 +23,7 @@ class Snake:
         self.clock = pygame.time.Clock()
         self.active_frames, self.tick_update, self.current_fps = 0, 0, 50
         self.number_color_combos = 15
-        self.color_random = random.randint(0, self.number_color_combos-1)
+        self.color_random = 0
         self.fps_meter = Text(self, f"FPS: {self.current_fps}", 30, (0, 200, 0), 65, 890)
         self.square_size = 40
         self.grid = Grid(self, (self.square_size-1, self.square_size-1), (self.square_size, self.square_size))
@@ -69,23 +69,26 @@ class Snake:
             info = self.homer_info[self.room[0], self.room[1]]
             for x in range(len(info)): info[x] = int(info[x])
             self.homer = Homing(self, info[1], info[4], [info[2], info[3]])
+        else: self.homer = False
         self.starter_homer = False
         
     def run_game(self):
         """The constant loop of all events"""
         while True:
             self._check_events()
+            for enemy in self.enemys:
+                enemy.check_collisions()
             for enemy in range(len(self.enemys)):
                 if not self.active_frames%(self.enemy_info[self.room[0], self.room[1]][enemy][0]):
                     self.enemys[enemy].move_forward()
+            if self.homer:
+                self.homer.check_collisions()
             self._move_snake()
             self._update_fps()
-            if not self.active_frames%self.homer.frame:
+            if self.homer and not self.active_frames%self.homer.frame:
                 self.homer.move_one()
             if self.snake_bite.active and not (self.active_frames-self.snake_bite.started_frame)%5:
                 self.snake_bite.move_one()
-            for enemy in self.enemys:
-                enemy.check_collisions()
             if self.changed_frame:
                 self._update_screen()
             self.active_frames += 1
@@ -110,6 +113,9 @@ class Snake:
                             self.number_squares -= 1
                             self.snake_bite.chomper()
                             self._kill_squares()
+                    """r=wallremove, e=add enemy square, o=remove e square, p = slow enemy, q = fast enemy,
+                    l=long enemy, a=short enemy, b=add food, n=remove food, h=long homer, g=short homer
+                    y=enable homer select, t=toggle homer in room, v=slow homer, c=fast homer"""
                 elif event.key in [pygame.K_r, pygame.K_e, pygame.K_o, pygame.K_p, pygame.K_q, pygame.K_l,
                     pygame.K_a, pygame.K_b, pygame.K_n, pygame.K_h, pygame.K_g, pygame.K_y, pygame.K_t,
                     pygame.K_v, pygame.K_c]: self.save_changes = True
@@ -158,8 +164,9 @@ class Snake:
                         self.homer.kill_squares()
                 elif event.key == pygame.K_y: self.starter_homer = not self.starter_homer
                 elif event.key == pygame.K_t: 
-                    self.homer_info[self.room[0], self.room[1]][0] = not int(self.homer_info[self.room[0], 
-                        self.room[1]][0])
+                    if int(self.homer_info[self.room[0], self.room[1]][0]):
+                        self.homer_info[self.room[0], self.room[1]][0] = 0
+                    else: self.homer_info[self.room[0], self.room[1]][0] = 1
                 elif event.key == pygame.K_v: 
                     self.homer_info[self.room[0], self.room[1]][4] = int(self.homer_info[self.room[0],
                     self.room[1]][4])+1
@@ -257,6 +264,11 @@ class Snake:
         #print(self.room)
         self.snake_map = numpy.full((self.grid.number_rows, self.grid.number_columns), 
                 fill_value = MI.CLEAR, dtype=object)
+        self.homer = False
+        if int(self.homer_info[self.room[0], self.room[1]][0]):
+            info = self.homer_info[self.room[0], self.room[1]]
+            for x in range(len(info)): info[x] = int(info[x])
+            self.homer = Homing(self, info[1], info[4], [info[2], info[3]])
         self.file_setup.map_writeout(self.room_sets, itemid=MI.WALL)
         self.file_setup.map_writeout(self.game_food_copy, itemid=MI.FOOD)
         self.wall_squares = self.file_setup.update_wall_squares_set(self.room_sets)
@@ -305,27 +317,30 @@ class Snake:
             self.tick_update = 0
             self.fps_meter._prep_text(f"FPS: {round(self.current_fps)}")
 
-    def _update_snake(self, x):
+    def _update_snake(self, x, coord_list, color):
         """Center each snake square in the appropriate spot, then finagle to make it look better"""
         adjustment = [0, 0]
-        index = self.snake_squares.index(x)
-        if x != self.snake_squares[-1]:
+        index = coord_list.index(x)
+        if x != coord_list[-1]:
             for dir in range(2):
-                if self.snake_squares[index+1][dir]!=self.snake_squares[index][dir]:
-                    if x!=self.snake_squares[0]:
-                        if self.snake_squares[index-1][not dir]==self.snake_squares[index][not dir]:
+                if coord_list[index+1][dir]!=coord_list[index][dir]:
+                    if x!=coord_list[0]:
+                        if coord_list[index-1][not dir]==coord_list[index][not dir]:
                             adjustment[not dir] += 12
                         else:
                             for y in range(2): adjustment[y] += 6
                     else: adjustment[not dir] += 12
-        if x == self.snake_squares[-1]: 
+        if x == coord_list[-1]: 
             for y in range(2): adjustment[y]+=10
         square_stats = [self.snake_rect_size[0]+adjustment[0], self.snake_rect_size[1]+adjustment[1]]
         close_rect = pygame.Rect(self.grid.grid_array[x[0], x[1]].left, self.grid.grid_array[x[0], x[1]].top,
             square_stats[0], square_stats[1])
         close_rect.center = self.grid.grid_array[x[0], x[1]].center
-        pygame.draw.rect(self.screen, (0, 255, 0), close_rect)
-        pygame.draw.rect(self.screen, (0, 150, 0), close_rect, width = 2)
+        pygame.draw.rect(self.screen, color, close_rect)
+        outer_color = [0, 0, 0]
+        for x in range(3):
+            if color[x]: outer_color[x] = color[x]-100
+        pygame.draw.rect(self.screen, outer_color, close_rect, width = 2)
 
     def _update_screen(self):
         """Update the screen with the new frame"""
@@ -342,13 +357,14 @@ class Snake:
                 else: 
                     self.grid.random_color_pattern(row_number, column_number)
                     if square == MI.SNAKE:
-                        self._update_snake([row_number, column_number])
+                        self._update_snake([row_number, column_number], self.snake_squares, (0, 255, 0))
         for enemy in self.enemys:
             for x in enemy.list_of_active_squares():
                 if type(x) == list: 
                     pygame.draw.rect(self.screen, (0, 0, 0), self.grid.grid_array[x[0], x[1]])
-        for x in self.homer.enemy_squares:
-            pygame.draw.rect(self.screen, (0, 0, 0), self.grid.grid_array[x[0], x[1]])
+        if self.homer:
+            for x in self.homer.enemy_squares:
+                self._update_snake(x, self.homer.enemy_squares, (255, 0, 0))
         self.fps_meter.draw_text()
         self.snake_bite.draw_bite()
         pygame.display.flip()
