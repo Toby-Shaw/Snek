@@ -10,7 +10,7 @@ class File_Converter:
         string = str(f.read())
         self.read_squares = string.split()
         flag = [0, 0]
-        list_container = numpy.empty((4, 4), dtype=object)
+        list_container = numpy.empty((3, 3), dtype=object)
         for x in range(len(self.read_squares)):
             if not list_container[flag[0], flag[1]] and self.read_squares[x]!='||':
                 list_container[flag[0], flag[1]] = [self.read_squares[x]]
@@ -24,7 +24,7 @@ class File_Converter:
                     flag[0] += 1
         if extra_layer:
             one_split = numpy.copy(list_container)
-            list_container = numpy.empty((4, 4), dtype=object)
+            list_container = numpy.empty((3, 3), dtype=object)
             for row in range(len(one_split)):
                 for column in range(len(one_split[0])):
                     list_container[row, column] = []
