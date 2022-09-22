@@ -30,7 +30,8 @@ class Snake:
         self.file_setup = File_Converter(self)
         self.snake_bite = Snake_Bite(self)
         self.max_enemy_count = 10
-        self.snake_delay = 7
+        self.snake_delay = [7, 4]
+        self.stage = 0
         self.snake_head, self.snake_rect_size, self.snake_squares = [11, 17], (25, 25), [[11, 17]]
         self.snake_map = numpy.full((self.grid.number_rows, self.grid.number_columns), fill_value = MI.CLEAR, dtype=object)
         self.snake_map[11, 17] = MI.SNAKE
@@ -191,11 +192,13 @@ class Snake:
     def _move_snake(self):
         '''Every given frame amount, move the snake one square in the specified direction
             and then clear the square behind if needed, and check food status'''
-        if not (self.active_frames % self.snake_delay):
+        if not (self.active_frames % self.snake_delay[self.stage]):
             if self.movement[0]: self._move_one(0)
             elif self.movement[1]: self._move_one(1)
             self._kill_squares()
             self._food_check()
+            if len(self.snake_squares)>6: self.stage = 1
+            else: self.stage = 0
 
     def _move_one(self, dir):
         """Move the snake along the x or y axis, x: dir=0, y: dir=1, updating appropriate lists"""
@@ -232,7 +235,7 @@ class Snake:
         temp_check = self.file_setup.update_wall_squares_set(self.room_sets, current_room=False, 
                 room = (self.room[0]+self.movement[1],self.room[1]+self.movement[0]))
         if [affected_coords[dir], affected_coords[not dir]] not in temp_check:
-            if self.room_cooldown>self.snake_delay:
+            if self.room_cooldown>self.snake_delay[self.stage]:
                 self.room_cooldown = 0
                 self._kill_squares(reset=True, remainder = 1) 
                 self._next_room_setup((self.room[0]+self.movement[1], self.room[1]+self.movement[0]))
