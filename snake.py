@@ -30,7 +30,7 @@ class Snake:
         self.file_setup = File_Converter(self)
         self.snake_bite = Snake_Bite(self)
         self.max_enemy_count = 10
-        self.snake_delay = [7, 4]
+        self.snake_delay = [7, 5]
         self.stage = 0
         self.snake_head, self.snake_rect_size, self.snake_squares = [11, 17], (25, 25), [[11, 17]]
         self.snake_map = numpy.full((self.grid.number_rows, self.grid.number_columns), fill_value = MI.CLEAR, dtype=object)
@@ -42,11 +42,6 @@ class Snake:
         self.enemy_info = self.file_setup.refine_enemy_info(self.enemy_info)
         self.food_sets = self.file_setup.file_to_room_sets('Games/Snake/data_storage/food_positions.txt')
         self.game_food_copy = numpy.copy(self.food_sets)
-        #print(self.food_sets)
-        #print(self.enemy_info)
-        #print(self.enemy_sets)
-        #print(self.room_sets)
-        #print(self.homer_info)
         self.wall_squares, self.enemys, self.room = [], [], [0, 0]
         for x in range(len(self.enemy_sets[self.room[0], self.room[1]])):
             self.enemys.append(Enemy(self, self.enemy_info[self.room[0], self.room[1]][x][1], 
@@ -197,7 +192,7 @@ class Snake:
             elif self.movement[1]: self._move_one(1)
             self._kill_squares()
             self._food_check()
-            if len(self.snake_squares)>6: self.stage = 1
+            if len(self.snake_squares)>5: self.stage = 1
             else: self.stage = 0
 
     def _move_one(self, dir):
@@ -210,7 +205,7 @@ class Snake:
             self.snake_head[dir] = affected_coords[0]
             self.snake_map[affected_coords[dir], affected_coords[not dir]] = MI.SNAKE
             self.snake_squares.append(self.snake_head.copy())
-        elif not ((affected_coords == self.snake_squares[-2] or 
+        elif not (len(self.snake_squares)>1 and (affected_coords == self.snake_squares[-2] or 
             [affected_coords[1], affected_coords[0]] == self.snake_squares[-2])): 
                 self._snake_ded()
 
@@ -221,13 +216,13 @@ class Snake:
             affected_coords[1] = self.grid.columnrow[dir]-1 
             if self.room[not dir] > 0:
                 affected_coords = self._checking_walls(affected_coords, dir)
-            else: self._shift_to_open_square(affected_coords, dir)
+            else: affected_coords = self._shift_to_open_square(affected_coords, dir)
         elif affected_coords[1]>=self.grid.columnrow[dir]:
             #Crossing bottom or right border, based on dir
             affected_coords[1] = 0
             if self.room[not dir] < len(self.room_sets)-1: 
                 affected_coords = self._checking_walls(affected_coords, dir)
-            else: self._shift_to_open_square(affected_coords, dir)
+            else: affected_coords = self._shift_to_open_square(affected_coords, dir)
         return(affected_coords)
 
     def _checking_walls(self, affected_coords, dir):
@@ -241,7 +236,8 @@ class Snake:
                 self._next_room_setup((self.room[0]+self.movement[1], self.room[1]+self.movement[0]))
             else:
                 affected_coords = [self.snake_head[dir], self.snake_head[not dir]-self.movement[dir]]
-        else: self._shift_to_open_square(affected_coords, dir)
+        else: 
+            affected_coords = self._shift_to_open_square(affected_coords, dir)
         return(affected_coords)
 
     def _shift_to_open_square(self, affected_coords, dir):
@@ -251,12 +247,12 @@ class Snake:
         #self.room_cooldown = 0
         if self.snake_map[affected_coords[dir], affected_coords[not dir]] == MI.WALL:
             for x in range(int(self.dimensions[not dir]/self.square_size)):
-                if affected_coords[0]+x<self.dimensions[not dir]/self.square_size and not (
-                    self.snake_map[affected_coords[dir]+(not dir)*x, affected_coords[not dir]+(dir)*x]):          
+                if affected_coords[0]+x<self.dimensions[not dir]/self.square_size and (
+                    self.snake_map[affected_coords[dir]+(not dir)*x, affected_coords[not dir]+(dir)*x] == MI.CLEAR):          
                     affected_coords[0]+=x
                     break
-                elif affected_coords[0]-x>=0 and not self.snake_map[affected_coords[dir]-(not dir)*x, 
-                        affected_coords[not dir]-dir*x]:
+                elif affected_coords[0]-x>=0 and (self.snake_map[affected_coords[dir]-(not dir)*x, 
+                        affected_coords[not dir]-dir*x] == MI.CLEAR):
                     affected_coords[0]-=x
                     break
         return(affected_coords)
