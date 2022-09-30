@@ -11,7 +11,7 @@ class Text:
         self.posy = posy
         self.font_color = font_color
         self.font = pygame.ftfont.SysFont(None, font_size)
-        self.bg_color = (200, 200, 200)
+        self.bg_color = (255, 255, 255)
         self.text = text
         self.line_spacing = line_spacing
         self.alignment = alignment

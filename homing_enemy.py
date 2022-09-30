@@ -34,7 +34,7 @@ class Homing:
     def run_through_options(self, movement, point):
         """For when movement is blocked by a wall, try other options"""
         options = [movement[0], movement[1], movement[0]*-1, movement[1]*-1]
-        sets = [[1, 2], [3, 2], [2, 3]]
+        sets = [[1, 2], [3, 2], [2, 3], [1, 0]]
         for x in range(len(sets)):
             possible = [point[0]+options[sets[x][0]], point[1]+options[sets[x][1]]]
             if (possible[1]>self.snake.grid.number_columns-1) or (possible[0]>self.snake.grid.number_rows-1):

@@ -7,9 +7,12 @@ from enemy import Enemy
 from file_converter import File_Converter
 from walls import Walls
 import random
+from time import sleep
 from snake_bite import Snake_Bite
 from all_enums import MAP_IDs as MI
+from all_enums import ROOM_IDs as RI
 from homing_enemy import Homing
+from snaky_button import Button
 
 class Snake:
     """Snake!"""
@@ -67,35 +70,43 @@ class Snake:
             self.homer = Homing(self, info[1], info[4], [info[2], info[3]])
         else: self.homer = False
         self.starter_homer = False
+        self.screen_phase = RI.MENU
+        self.title = Text(self, "SNek", 70, (0, 0, 0), 700, 200)
+        self.start = Button(self, "Start", (0, 255, 0), 700, 500)
+        self.held = False
         
     def run_game(self):
         """The constant loop of all events"""
         while True:
             self._check_events()
-            for enemy in self.enemys:
-                enemy.check_collisions()
-            for enemy in range(len(self.enemys)):
-                if not self.active_frames%(self.enemy_info[self.room[0], self.room[1]][enemy][0]):
-                    self.enemys[enemy].move_forward()
-            if self.homer:
-                self.homer.check_collisions()
-            self._move_snake()
-            self._update_fps()
-            if self.homer and not self.active_frames%self.homer.frame:
-                self.homer.move_one()
-            if self.snake_bite.active and not (self.active_frames-self.snake_bite.started_frame)%5:
-                self.snake_bite.move_one()
+            if self.screen_phase == RI.GAME:
+                for enemy in self.enemys:
+                    enemy.check_collisions()
+                for enemy in range(len(self.enemys)):
+                    if not self.active_frames%(self.enemy_info[self.room[0], self.room[1]][enemy][0]):
+                        self.enemys[enemy].move_forward()
+                if self.homer:
+                    self.homer.check_collisions()
+                self._move_snake()
+                self._update_fps()
+                if self.homer and not self.active_frames%self.homer.frame:
+                    self.homer.move_one()
+                if self.snake_bite.active and not (self.active_frames-self.snake_bite.started_frame)%5:
+                    self.snake_bite.move_one()
+                self.active_frames += 1
+                self.room_cooldown += 1
+            elif self.screen_phase == RI.MENU:
+                pass
             if self.changed_frame:
                 self._update_screen()
-            self.active_frames += 1
-            self.room_cooldown += 1
+           
 
     def _check_events(self):
         """Check keyboard and mouse inputs"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self._snake_ded()
-            elif event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN and self.screen_phase == RI.GAME:
                 mouse_pos = pygame.mouse.get_pos()
                 self.row_selected = mouse_pos[1]//self.square_size
                 self.column_selected = mouse_pos[0]//self.square_size
@@ -174,15 +185,21 @@ class Snake:
                 elif event.__dict__['unicode'] in '0123456789':
                     try: self.number_selected = int(event.__dict__['unicode'])
                     except: pass
-            elif pygame.mouse.get_pressed()[0]: 
-                self.save_changes = True
-                if not self.starter_homer: self.walls._add_wall_square()
-                else: 
-                    self.homer_info[self.room[0], self.room[1]][2] = self.row_selected
-                    self.homer_info[self.room[0], self.room[1]][3] = self.column_selected
-                    info = self.homer_info[self.room[0], self.room[1]]
-                    for x in range(len(info)): info[x] = int(info[x])
-                    self.homer = Homing(self, info[1], info[4], [info[2], info[3]])
+            elif pygame.mouse.get_pressed()[0]:
+                if self.screen_phase == RI.GAME and not self.held:
+                    self.save_changes = True
+                    if not self.starter_homer: self.walls._add_wall_square()
+                    else: 
+                        self.homer_info[self.room[0], self.room[1]][2] = self.row_selected
+                        self.homer_info[self.room[0], self.room[1]][3] = self.column_selected
+                        info = self.homer_info[self.room[0], self.room[1]]
+                        for x in range(len(info)): info[x] = int(info[x])
+                        self.homer = Homing(self, info[1], info[4], [info[2], info[3]])
+                elif self.screen_phase == RI.MENU:
+                    if self.start.check_collision():
+                        self.held = True
+                        self.screen_phase = RI.GAME
+            elif self.held and not pygame.mouse.get_pressed()[0]: self.held = False
                
     def _move_snake(self):
         '''Every given frame amount, move the snake one square in the specified direction
@@ -345,27 +362,32 @@ class Snake:
         """Update the screen with the new frame"""
         self.changed_frame = False
         self.screen.fill((255, 255, 255))
-        for row_number in range(len(self.grid.grid_array)):
-            for column_number in range(len(self.grid.grid_array[0])):
-                square = self.snake_map[row_number, column_number]
-                if square==MI.WALL: 
-                    pygame.draw.rect(self.screen, (50, 50, 50), self.grid.grid_array[row_number, column_number])
-                    continue
-                elif square==MI.FOOD:
-                    pygame.draw.rect(self.screen, (255, 0, 0), self.grid.grid_array[row_number, column_number])
-                else: 
-                    self.grid.random_color_pattern(row_number, column_number)
-                    if square == MI.SNAKE:
-                        self._update_snake([row_number, column_number], self.snake_squares, (0, 255, 0))
-        for enemy in self.enemys:
-            for x in enemy.list_of_active_squares():
-                if type(x) == list: 
-                    pygame.draw.rect(self.screen, (0, 0, 0), self.grid.grid_array[x[0], x[1]])
-        if self.homer:
-            for x in self.homer.enemy_squares:
-                self._update_snake(x, self.homer.enemy_squares, (255, 0, 0))
+        if self.screen_phase == RI.GAME:
+            for row_number in range(len(self.grid.grid_array)):
+                for column_number in range(len(self.grid.grid_array[0])):
+                    square = self.snake_map[row_number, column_number]
+                    if square==MI.WALL: 
+                        pygame.draw.rect(self.screen, (50, 50, 50), self.grid.grid_array[row_number, column_number])
+                        continue
+                    elif square==MI.FOOD:
+                        pygame.draw.rect(self.screen, (255, 0, 0), self.grid.grid_array[row_number, column_number])
+                    else: 
+                        self.grid.random_color_pattern(row_number, column_number)
+                        if square == MI.SNAKE:
+                            self._update_snake([row_number, column_number], self.snake_squares, (0, 255, 0))
+            for enemy in self.enemys:
+                for x in enemy.list_of_active_squares():
+                    if type(x) == list: 
+                        self._update_snake(x, enemy.list_of_active_squares(), (0, 0, 0))
+                        #pygame.draw.rect(self.screen, (0, 0, 0), self.grid.grid_array[x[0], x[1]])
+            if self.homer:
+                for x in self.homer.enemy_squares:
+                    self._update_snake(x, self.homer.enemy_squares, (255, 0, 0))
+            self.snake_bite.draw_bite()
+        elif self.screen_phase == RI.MENU:
+            self.title.draw_text()
+            self.start.draw_button()
         self.fps_meter.draw_text()
-        self.snake_bite.draw_bite()
         pygame.display.flip()
 
     def _snake_ded(self):
